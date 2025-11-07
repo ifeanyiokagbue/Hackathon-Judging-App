@@ -1,10 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { useHackathon } from '../context/HackathonContext';
 import type { Score } from '../types';
 
 const JudgingScreen: React.FC = () => {
-    const { groups, criteria, dispatch } = useHackathon();
+    const { activeHackathon, judgeName, dispatch } = useHackathon();
+    const groups = activeHackathon?.groups || [];
+    const criteria = activeHackathon?.criteria || [];
+    
     const [selectedGroupId, setSelectedGroupId] = useState<string>('');
     const [currentScores, setCurrentScores] = useState<Record<string, number>>({});
     const [showSuccess, setShowSuccess] = useState(false);
@@ -30,10 +32,11 @@ const JudgingScreen: React.FC = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedGroupId || Object.keys(currentScores).length === 0) return;
+        if (!selectedGroupId || !judgeName || Object.keys(currentScores).length === 0) return;
 
         const newScore: Score = {
             groupId: selectedGroupId,
+            judgeName: judgeName,
             scores: currentScores,
         };
         dispatch({ type: 'SUBMIT_SCORE', payload: newScore });
@@ -60,7 +63,7 @@ const JudgingScreen: React.FC = () => {
         return (
             <div className="text-center p-8 bg-gray-800 rounded-lg border border-gray-700">
                 <h2 className="text-2xl font-bold text-yellow-400">Setup Required</h2>
-                <p className="mt-2 text-gray-400">Please add at least one group and one criterion in the 'Setup' tab before judging.</p>
+                <p className="mt-2 text-gray-400">Please ask an admin to add at least one group and one criterion in the 'Setup' tab before judging.</p>
             </div>
         );
     }

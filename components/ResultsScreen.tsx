@@ -1,37 +1,60 @@
-
 import React, { useMemo } from 'react';
 import { useHackathon } from '../context/HackathonContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const ResultsScreen: React.FC = () => {
-    const { groups, scores, criteria } = useHackathon();
+    const { activeHackathon } = useHackathon();
+    const groups = activeHackathon?.groups || [];
+    const scores = activeHackathon?.scores || [];
+    const criteria = activeHackathon?.criteria || [];
 
     const processedData = useMemo(() => {
-        const scoreMap: Record<string, { name: string; totalScore: number; breakdown: Record<string, number> }> = {};
+        const scoreMap: Record<string, { name: string; submissions: any[] }> = {};
 
         groups.forEach(group => {
             scoreMap[group.id] = { 
                 name: group.name, 
-                totalScore: 0,
-                breakdown: criteria.reduce((acc, crit) => ({...acc, [crit.name]: 0}), {})
+                submissions: []
             };
         });
 
         scores.forEach(scoreEntry => {
             if (scoreMap[scoreEntry.groupId]) {
-                let entryTotal = 0;
-                Object.entries(scoreEntry.scores).forEach(([criterionId, score]) => {
-                    entryTotal += score;
-                    const criterion = criteria.find(c => c.id === criterionId);
-                    if (criterion) {
-                      scoreMap[scoreEntry.groupId].breakdown[criterion.name] += score;
-                    }
-                });
-                scoreMap[scoreEntry.groupId].totalScore += entryTotal;
+                scoreMap[scoreEntry.groupId].submissions.push(scoreEntry);
             }
         });
+        
+        return Object.values(scoreMap).map(groupData => {
+            const judgeCount = groupData.submissions.length;
+            if (judgeCount === 0) {
+                return {
+                    name: groupData.name,
+                    averageScore: 0,
+                    judgeCount: 0,
+                    judges: [],
+                    breakdown: criteria.reduce((acc, crit) => ({...acc, [crit.name]: 0}), {})
+                };
+            }
 
-        return Object.values(scoreMap).sort((a, b) => b.totalScore - a.totalScore);
+            const breakdown: Record<string, number> = {};
+            criteria.forEach(c => {
+                const total = groupData.submissions.reduce((sum, sub) => sum + (sub.scores[c.id] || 0), 0);
+                breakdown[c.name] = total / judgeCount;
+            });
+
+            const totalAverageScore = Object.values(breakdown).reduce((sum, score) => sum + score, 0);
+            const judges = [...new Set(groupData.submissions.map(s => s.judgeName))];
+
+            return {
+                name: groupData.name,
+                averageScore: parseFloat(totalAverageScore.toFixed(2)),
+                judgeCount,
+                judges,
+                breakdown
+            };
+
+        }).sort((a, b) => b.averageScore - a.averageScore);
+
     }, [groups, scores, criteria]);
 
     if (groups.length === 0) {
@@ -58,7 +81,6 @@ const ResultsScreen: React.FC = () => {
                 Live Hackathon Leaderboard
             </h2>
             
-            {/* Chart */}
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 shadow-2xl h-96">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={processedData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
@@ -74,12 +96,11 @@ const ResultsScreen: React.FC = () => {
                             cursor={{ fill: 'rgba(100, 116, 139, 0.1)' }}
                         />
                         <Legend wrapperStyle={{ color: '#E2E8F0' }} />
-                        <Bar dataKey="totalScore" fill="#6366F1" name="Total Score" />
+                        <Bar dataKey="averageScore" fill="#6366F1" name="Average Score" />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
 
-            {/* Detailed Table */}
             <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden">
                 <h3 className="text-xl font-bold p-4 border-b border-gray-700">Detailed Score Breakdown</h3>
                 <div className="overflow-x-auto">
@@ -88,7 +109,8 @@ const ResultsScreen: React.FC = () => {
                             <tr>
                                 <th className="p-4 font-semibold">Rank</th>
                                 <th className="p-4 font-semibold">Group</th>
-                                <th className="p-4 font-semibold text-right">Total Score</th>
+                                <th className="p-4 font-semibold text-right">Avg. Score</th>
+                                <th className="p-4 font-semibold text-center">Judges ({'Votes'})</th>
                                 {criteria.map(c => <th key={c.id} className="p-4 font-semibold text-right">{c.name}</th>)}
                             </tr>
                         </thead>
@@ -97,9 +119,14 @@ const ResultsScreen: React.FC = () => {
                                 <tr key={group.name} className="border-t border-gray-700 hover:bg-gray-700/50">
                                     <td className="p-4 font-bold text-lg">{index + 1}</td>
                                     <td className="p-4 font-semibold text-indigo-400">{group.name}</td>
-                                    <td className="p-4 font-bold text-right">{group.totalScore}</td>
+                                    <td className="p-4 font-bold text-right">{group.averageScore}</td>
+                                    <td className="p-4 text-xs text-gray-400 text-center">
+                                      <div className="max-w-xs mx-auto">
+                                        {group.judges.join(', ')} ({group.judgeCount})
+                                      </div>
+                                    </td>
                                     {criteria.map(c => (
-                                      <td key={c.id} className="p-4 text-right">{group.breakdown[c.name] || 0}</td>
+                                      <td key={c.id} className="p-4 text-right">{(group.breakdown[c.name] || 0).toFixed(2)}</td>
                                     ))}
                                 </tr>
                             ))}
