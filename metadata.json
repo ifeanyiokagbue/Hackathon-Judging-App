@@ -1,0 +1,5 @@
+{
+  "name": "Live Hackathon Judging Dashboard",
+  "description": "A comprehensive system for hackathon organizers to configure judging criteria and groups, for judges to submit scores, and for the public to view live, dynamically updated results.",
+  "requestFramePermissions": []
+}
